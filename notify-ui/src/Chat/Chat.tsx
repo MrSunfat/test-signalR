@@ -5,40 +5,34 @@ import ChatWindow, { ChatType } from './ChatWindow/ChatWindow';
 import ChatInput from './ChatInput/ChatInput';
 
 const Chat = () => {
-    const [ connection, setConnection ] = useState<HubConnection | null>(null);
+    // const [ connection, setConnection ] = useState<HubConnection | null>(null);
     const [ chat, setChat ] = useState<ChatType[]>([]);
     const latestChat = useRef<ChatType[] | null>(null);
 
     latestChat.current = chat;
 
     useEffect(() => {
-        const newConnection = new HubConnectionBuilder()
+        const connection = new HubConnectionBuilder()
             .withUrl('https://localhost:44380/hubs/chat')
             .withAutomaticReconnect()
             .build();
 
-        setConnection(newConnection);
-    }, []);
+        connection.start()
+            .then(result => {
+                console.log('Connected!');
 
-    useEffect(() => {
-        if (connection) {
-            connection.start()
-                .then(result => {
-                    console.log('Connected!');
-    
-                    connection.on('ReceiveMessage', message => {
-                        let updatedChat: ChatType[] = [];
-                        if (latestChat.current && latestChat.current.length > 0) {
-                            updatedChat = [...latestChat.current];
-                        }
-                        updatedChat.push(message);
-                    
-                        setChat(updatedChat);
-                    });
-                })
-                .catch(e => console.log('Connection failed: ', e));
-        }
-    }, [connection]);
+                connection.on('ReceiveMessage', message => {
+                    let updatedChat: ChatType[] = [];
+                    if (latestChat.current && latestChat.current.length > 0) {
+                        updatedChat = [...latestChat.current];
+                    }
+                    updatedChat.push(message);
+                
+                    setChat(updatedChat);
+                });
+            })
+            .catch(e => console.log('Connection failed: ', e));
+    }, []);
 
     const sendMessage = async (user: string, message: string) => {
         const chatMessage = {
@@ -46,16 +40,17 @@ const Chat = () => {
             message: message
         };
 
-        if (connection?.connectionId) {
-            try {
-                await connection.send('SendMessage', chatMessage);
-            }
-            catch(e) {
-                console.log(e);
-            }
+        try {
+            await  fetch('https://localhost:44380/chat/messages', { 
+                method: 'POST', 
+                body: JSON.stringify(chatMessage),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
         }
-        else {
-            alert('No connection to server yet.');
+        catch(e) {
+            console.log('Sending message failed.', e);
         }
     }
 
